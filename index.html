@@ -19,7 +19,6 @@
     </script>
     <style> 
         body { font-family: 'Inter', sans-serif; } 
-        /* Prevent zoom on mobile inputs */
         input, textarea, select { font-size: 16px !important; }
     </style>
 </head>
@@ -64,20 +63,26 @@
                 checkModels();
             }, []);
 
-            // --- 2. ANDROID DUPLICATION FIX ---
-            const cleanMobileDuplication = (text) => {
+            // --- 2. ANDROID DUPLICATION FIXER ---
+            const cleanTranscript = (text) => {
                 if (!text) return "";
-                // Fix: Remove immediate repetition at start (e.g., "मीमी" -> "मी")
-                // Check if the first two characters are identical and it's a short word
-                if (text.length > 2 && text[0] === text[1] && text[2] === ' ') {
-                     return text.substring(1); 
+                let cleaned = text;
+
+                // FIX 1: Remove immediate duplicates joined together (e.g., "तुलातुला" -> "तुला")
+                // This regex finds any group of 2+ characters that repeats immediately
+                cleaned = cleaned.replace(/(.{2,})\1+/gu, '$1');
+
+                // FIX 2: Remove duplicates separated by space (e.g., "मी मी" -> "मी")
+                const words = cleaned.split(' ');
+                const uniqueWords = [];
+                for (let i = 0; i < words.length; i++) {
+                    if (i === 0 || words[i] !== words[i-1]) {
+                        uniqueWords.push(words[i]);
+                    }
                 }
-                // Check for whole word repetition at start "Word Word" -> "Word"
-                const parts = text.split(' ');
-                if (parts.length > 1 && parts[0] === parts[1]) {
-                    return parts.slice(1).join(' ');
-                }
-                return text;
+                cleaned = uniqueWords.join(' ');
+
+                return cleaned;
             };
 
             // --- 3. SPEECH RECOGNITION ---
@@ -96,9 +101,8 @@
                         let final = '';
                         for (let i = 0; i < e.results.length; ++i) final += e.results[i][0].transcript;
                         
-                        // Apply Mobile Fix
-                        const cleaned = cleanMobileDuplication(final);
-                        setTranscript(cleaned); 
+                        // APPLY THE FIX HERE
+                        setTranscript(cleanTranscript(final)); 
                     };
                     recognitionRef.current = recognition;
                 }
@@ -116,9 +120,8 @@
                 if (isListening) recognitionRef.current?.stop();
             };
 
+            // Stop listening if user taps to edit (prevents conflict)
             const handleFocus = () => {
-                // IMPORTANT: Stop listening if user taps to type
-                // This prevents the keyboard and mic from fighting (which causes duplication)
                 if (isListening) {
                     recognitionRef.current?.stop();
                     setIsListening(false);
